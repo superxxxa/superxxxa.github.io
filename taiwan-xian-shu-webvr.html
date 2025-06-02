@@ -1,391 +1,886 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
-    <meta charset="utf-8">
-    <title>時光偵探：尋找失落的台灣縣署</title>
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://unpkg.com/aframe-environment-component@1.3.1/dist/aframe-environment-component.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>時光密室：尋找失落的台灣縣署</title>
     <style>
-        #gameUI {
-            position: fixed;
-            top: 10px;
-            left: 10px;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            @media (max-width: 768px) {
+                .successContent {
+                    padding: 20px;
+                }
+                
+                .successContent h1 {
+                    font-size: 24px;
+                }
+                
+                .buttonGroup {
+                    flex-direction: column;
+                    width: 100%;
+                }
+                
+                .actionButton {
+                    width: 100%;
+                }
+            }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: #222;
             color: white;
-            font-family: Arial;
-            z-index: 999;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
-            border-radius: 5px;
+            overflow: hidden;
+            user-select: none;
         }
-        #clueNotification {
-            position: fixed;
-            bottom: 20px;
+
+        /* 遊戲容器 */
+        #gameContainer {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 頂部UI */
+        #topUI {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            border-bottom: 3px solid #4CC3D9;
+        }
+
+        #sceneTitle {
+            font-size: 24px;
+            color: #4CC3D9;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        #timer {
+            font-size: 20px;
+            color: #FFD700;
+            font-weight: bold;
+        }
+
+        /* 主場景區域 */
+        #sceneArea {
+            flex: 1;
+            position: relative;
+            background-size: cover;
+            background-position: center;
+            cursor: pointer;
+            transition: filter 0.3s;
+        }
+
+        /* 底部物品欄 */
+        #inventory {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 120px;
+            background: rgba(0,0,0,0.9);
+            border-top: 3px solid #4CC3D9;
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            gap: 20px;
+            z-index: 100;
+        }
+
+        .inventorySlot {
+            width: 80px;
+            height: 80px;
+            border: 2px solid #666;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.1);
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .inventorySlot:hover {
+            border-color: #4CC3D9;
+            transform: scale(1.1);
+        }
+
+        .inventorySlot.filled {
+            border-color: #FFD700;
+            background: rgba(255,215,0,0.2);
+        }
+
+        .inventoryItem {
+            font-size: 40px;
+        }
+
+        .itemTooltip {
+            position: absolute;
+            bottom: 100%;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,150,0,0.9);
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
+            background: rgba(0,0,0,0.9);
+            padding: 5px 10px;
+            border-radius: 5px;
+            white-space: nowrap;
+            font-size: 14px;
             display: none;
-        }
-        #gameIntro {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.95);
-            color: white;
-            padding: 30px;
-            border-radius: 15px;
-            max-width: 700px;
-            max-height: 90vh;
-            overflow-y: auto;
-            z-index: 1000;
-            font-family: Arial, sans-serif;
-        }
-        #gameIntro h2 {
-            color: #4CC3D9;
-            text-align: center;
-            margin-bottom: 20px;
-            font-size: 28px;
-        }
-        #gameIntro h3 {
             color: #FFD700;
-            margin-top: 20px;
-            font-size: 20px;
         }
-        #gameIntro h4 {
-            color: #4CC3D9;
-            margin-bottom: 10px;
+
+        .inventorySlot:hover .itemTooltip {
+            display: block;
+        }
+
+        /* 可點擊物件 */
+        .clickable {
+            position: absolute;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .clickable:hover {
+            filter: brightness(1.3) drop-shadow(0 0 20px rgba(255,255,255,0.8));
+            transform: scale(1.05);
+        }
+
+        .clickable.glow {
+            animation: glow 2s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { filter: brightness(1) drop-shadow(0 0 10px rgba(255,215,0,0.5)); }
+            50% { filter: brightness(1.2) drop-shadow(0 0 20px rgba(255,215,0,0.8)); }
+        }
+
+        /* 對話框 */
+        #messageBox {
+            position: absolute;
+            bottom: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            padding: 20px 30px;
+            border-radius: 10px;
+            border: 2px solid #4CC3D9;
+            max-width: 600px;
+            text-align: center;
+            display: none;
+            z-index: 200;
             font-size: 18px;
-        }
-        #gameIntro ul {
-            margin: 15px 0;
-            padding-left: 20px;
-        }
-        #gameIntro li {
-            margin: 10px 0;
             line-height: 1.5;
         }
-        #gameIntro p {
-            line-height: 1.6;
-            margin: 8px 0;
+
+        /* 謎題介面 */
+        #puzzleModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
         }
-        #startButton {
-            display: block;
-            margin: 20px auto 0;
-            padding: 15px 30px;
+
+        .puzzleContent {
+            background: #333;
+            padding: 30px;
+            border-radius: 15px;
+            border: 3px solid #4CC3D9;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .puzzleContent h3 {
+            color: #4CC3D9;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .puzzleContent input {
+            padding: 10px 20px;
+            font-size: 18px;
+            border: 2px solid #666;
+            border-radius: 5px;
+            background: #222;
+            color: white;
+            margin: 10px;
+            text-align: center;
+        }
+
+        .puzzleContent button {
+            padding: 10px 30px;
+            font-size: 18px;
             background: #4CC3D9;
             color: white;
             border: none;
             border-radius: 5px;
-            font-size: 18px;
             cursor: pointer;
-            transition: background 0.3s;
+            margin: 10px;
+            transition: all 0.3s;
         }
-        #startButton:hover {
+
+        .puzzleContent button:hover {
             background: #3BA3B9;
+            transform: scale(1.05);
+        }
+
+        /* 開始畫面 */
+        #startScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 400;
+        }
+
+        .startContent {
+            background: #222;
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #4CC3D9;
+            max-width: 700px;
+            text-align: center;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .startContent h1 {
+            color: #4CC3D9;
+            margin-bottom: 20px;
+            font-size: 32px;
+        }
+
+        .startContent h2 {
+            color: #FFD700;
+            margin: 20px 0 10px;
+            font-size: 24px;
+        }
+
+        .startContent p {
+            line-height: 1.8;
+            margin: 10px 0;
+            font-size: 18px;
+        }
+
+        .missionBox {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: left;
+        }
+
+        .missionBox h3 {
+            color: #4CC3D9;
+            margin-bottom: 10px;
+        }
+
+        #startBtn {
+            padding: 15px 40px;
+            font-size: 24px;
+            background: #4CC3D9;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+
+        #startBtn:hover {
+            background: #3BA3B9;
+            transform: scale(1.1);
+        }
+
+        /* 場景切換動畫 */
+        .sceneTransition {
+            animation: fadeInOut 1s;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        /* 成功動畫 */
+        .success {
+            animation: successPulse 0.5s;
+        }
+
+        @keyframes successPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        /* 密碼鎖 */
+        .lockDisplay {
+            font-size: 48px;
+            font-family: 'Courier New', monospace;
+            color: #FFD700;
+            margin: 20px 0;
+            letter-spacing: 10px;
+        }
+
+        /* 藏頭詩 */
+        .poem {
+            font-size: 24px;
+            line-height: 2;
+            margin: 20px 0;
+            text-align: left;
+            display: inline-block;
+        }
+
+        .poem .firstChar {
+            color: #FFD700;
+            font-weight: bold;
+            font-size: 28px;
+            text-shadow: 0 0 10px rgba(255,215,0,0.5);
+        }
+
+        /* 地圖 */
+        #mapContainer {
+            position: relative;
+            width: 500px;
+            height: 400px;
+            margin: 20px auto;
+            background: #444;
+            border: 2px solid #666;
+            border-radius: 10px;
+        }
+
+        .mapMarker {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .mapMarker:hover {
+            transform: scale(1.2);
+        }
+
+        #chicanMarker {
+            background: #DC143C;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #countyMarker {
+            background: #FFD700;
+            top: 40%;
+            left: 60%;
+            cursor: move;
+        }
+
+        /* 成功畫面 */
+        #successScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+
+        .successContent {
+            background: #222;
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #FFD700;
+            max-width: 800px;
+            text-align: center;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .successContent h1 {
+            color: #FFD700;
+            margin-bottom: 20px;
+            font-size: 36px;
+            text-shadow: 0 0 20px rgba(255,215,0,0.5);
+        }
+
+        .successContent img {
+            max-width: 100%;
+            height: auto;
+            margin: 20px 0;
+            border: 2px solid #666;
+            border-radius: 10px;
+        }
+
+        .buttonGroup {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .actionButton {
+            padding: 15px 30px;
+            font-size: 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .restartButton {
+            background: #4CC3D9;
+            color: white;
+        }
+
+        .restartButton:hover {
+            background: #3BA3B9;
+            transform: scale(1.05);
+        }
+
+        .exitButton {
+            background: #DC143C;
+            color: white;
+        }
+
+        .exitButton:hover {
+            background: #B91C1C;
+            transform: scale(1.05);
+        }
+
+        /* 手機適配 */
+        @media (max-width: 768px) {
+            #topUI {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            #sceneTitle {
+                font-size: 18px;
+            }
+            
+            #inventory {
+                height: 80px;
+                padding: 5px 10px;
+            }
+            
+            .inventorySlot {
+                width: 60px;
+                height: 60px;
+            }
+            
+            .inventoryItem {
+                font-size: 30px;
+            }
+            
+            #messageBox {
+                font-size: 16px;
+                padding: 15px 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- 遊戲說明介面 -->
-    <div id="gameIntro">
-        <h2>🕰️ 時光偵探：尋找失落的台灣縣署</h2>
-        <h3>📖 故事背景</h3>
-        <p>小偵探你好！台南市在赤崁樓附近挖到了古老的建築遺跡，我們需要你幫忙確認這是不是「台灣縣署」（古代的縣政府）！</p>
-        
-        <h3>🎮 怎麼玩？</h3>
-        <ul>
-            <li><strong>滑鼠/手把：</strong>看到亮亮的物品，對準它按一下就可以了！</li>
-            <li><strong>移動：</strong>用搖桿走路，或點地板瞬間移動</li>
-            <li><strong>觀察：</strong>靠近一點看會更清楚喔！</li>
-        </ul>
-        
-        <h3>🎯 你的任務（共4關）</h3>
-        <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 10px 0;">
-            <h4>📍 第1關：考古現場</h4>
-            <p><strong>任務：</strong>找到一塊石碑，用手指跟著描一次上面的數字</p>
-            <p><strong>提示：</strong>石碑是灰色的大石頭，上面有「一六八四」</p>
-            <p><strong>獎勵：</strong>得到線索「1684年」（台灣設府的年份）</p>
+    <!-- 開始畫面 -->
+    <div id="startScreen">
+        <div class="startContent">
+            <h1>🔐 時光密室：尋找失落的台灣縣署</h1>
+            
+            <h2>📖 故事背景</h2>
+            <p>你被困在一個神秘的時光密室裡！要逃出去，必須穿越4個不同時代的房間，找出台灣縣署的秘密。每個房間都有一個謎題，解開後才能進入下一個房間。</p>
+            
+            <h2>🎮 怎麼玩？</h2>
+            <p>👆 點擊畫面上發光的物品收集線索<br>
+            📦 收集的物品會出現在下方物品欄<br>
+            🔍 點擊物品欄的東西可以查看詳情<br>
+            🧩 解開每個房間的謎題才能前進</p>
+            
+            <h2>🎯 四個密室挑戰</h2>
+            <div class="missionBox">
+                <h3>🏺 第1關：考古密室</h3>
+                <p>找出石碑上的神秘數字，這是開啟時光之門的密碼！</p>
+            </div>
+            
+            <div class="missionBox">
+                <h3>🏛️ 第2關：古代官府密室</h3>
+                <p>破解牆上詩句的秘密，找出這棟建築的真正名字！</p>
+            </div>
+            
+            <div class="missionBox">
+                <h3>🏫 第3關：日式教室密室</h3>
+                <p>解開黑板上的摩斯密碼，發現重要的地名！</p>
+            </div>
+            
+            <div class="missionBox">
+                <h3>🗺️ 第4關：地圖密室</h3>
+                <p>在古地圖上標記出縣署的正確位置，開啟最終的逃脫之門！</p>
+            </div>
+            
+            <p style="color: #FFD700; font-size: 20px; margin-top: 20px;">
+                ⏱️ 限時15分鐘！你能成功逃脫嗎？
+            </p>
+            
+            <p style="font-size: 14px; color: #888; margin-top: 15px;">
+                📊 本遊戲會記錄您的操作過程以改善遊戲體驗
+            </p>
+            
+            <button id="startBtn">開始挑戰</button>
         </div>
-        
-        <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 10px 0;">
-            <h4>🏛️ 第2關：清朝縣署</h4>
-            <p><strong>任務：</strong>找到牆上的詩，看看每句第一個字是什麼</p>
-            <p><strong>提示：</strong>有四句詩，第一個字連起來就是答案</p>
-            <p><strong>獎勵：</strong>得到線索「台灣縣署」（建築物的名字）</p>
-        </div>
-        
-        <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 10px 0;">
-            <h4>🏫 第3關：日本時代教室</h4>
-            <p><strong>任務：</strong>看黑板上的密碼，找出它代表的英文字</p>
-            <p><strong>提示：</strong>摩斯密碼下面有答案（CHIKAN = 赤崁）</p>
-            <p><strong>獎勵：</strong>得到線索「赤崁」（地名）</p>
-        </div>
-        
-        <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 10px 0;">
-            <h4>🗺️ 第4關：最終任務</h4>
-            <p><strong>任務：</strong>在3D地圖上，把金色圓球放到縣署的位置</p>
-            <p><strong>提示：</strong>縣署在赤崁樓的右上方（東北邊）</p>
-            <p><strong>獎勵：</strong>完成任務，發現縣署的秘密！</p>
-        </div>
-        
-        <h3>⏱️ 時間</h3>
-        <p style="font-size: 18px; color: #FFD700;">你有15分鐘，加油！每找到一個線索就會自動進入下一關。</p>
-        
-        <button id="startButton">我準備好了，開始遊戲！</button>
     </div>
-    
-    <div id="gameUI" style="display: none;">
-        <h3>時光偵探：尋找失落的台灣縣署</h3>
-        <p>場景: <span id="currentScene">考古現場</span></p>
-        <p>收集線索: <span id="clueCount">0</span>/4</p>
-        <p>時間: <span id="timer">15:00</span></p>
+
+    <!-- 遊戲主容器 -->
+    <div id="gameContainer" style="display: none;">
+        <!-- 頂部UI -->
+        <div id="topUI">
+            <div id="sceneTitle">第1關：考古密室</div>
+            <div id="timer">15:00</div>
+        </div>
+
+        <!-- 場景區域 -->
+        <div id="sceneArea"></div>
+
+        <!-- 訊息框 -->
+        <div id="messageBox"></div>
+
+        <!-- 物品欄 -->
+        <div id="inventory">
+            <div class="inventorySlot" data-slot="0">
+                <span class="itemTooltip"></span>
+            </div>
+            <div class="inventorySlot" data-slot="1">
+                <span class="itemTooltip"></span>
+            </div>
+            <div class="inventorySlot" data-slot="2">
+                <span class="itemTooltip"></span>
+            </div>
+            <div class="inventorySlot" data-slot="3">
+                <span class="itemTooltip"></span>
+            </div>
+            <div style="flex: 1; text-align: right; padding-right: 20px;">
+                <div style="font-size: 18px; color: #FFD700;">
+                    收集進度：<span id="progress">0/4</span>
+                </div>
+            </div>
+        </div>
     </div>
-    
-    <div id="clueNotification"></div>
 
-    <a-scene environment="preset: japan; groundColor: #445; grid: cross">
-        <!-- 資源定義 -->
-        <a-assets>
-            <!-- 可以在這裡加入圖片或模型資源 -->
-            <img id="mapTexture" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" alt="map">
-        </a-assets>
+    <!-- 謎題彈窗 -->
+    <div id="puzzleModal">
+        <div class="puzzleContent" id="puzzleContent">
+            <!-- 動態內容 -->
+        </div>
+    </div>
 
-        <!-- 相機與控制器 -->
-        <a-entity id="player" position="0 1.6 0">
-            <a-camera>
-                <a-cursor color="#4CC3D9"></a-cursor>
-            </a-camera>
-            <a-entity laser-controls="hand: right"></a-entity>
-            <a-entity laser-controls="hand: left"></a-entity>
-        </a-entity>
-
-        <!-- 場景1: 考古現場 -->
-        <a-entity id="scene1" visible="true">
-            <!-- 考古區域地面 -->
-            <a-plane position="0 0 -4" rotation="-90 0 0" width="10" height="10" 
-                     color="#8B7355" roughness="0.8">
-            </a-plane>
+    <!-- 成功畫面 -->
+    <div id="successScreen">
+        <div class="successContent">
+            <h1>🎊 恭喜成功逃脫！</h1>
+            <p style="font-size: 20px; color: #4CC3D9; margin-bottom: 20px;">
+                你成功找到了失落的台灣縣署！
+            </p>
             
-            <!-- 石碑 (軌跡解謎) -->
-            <a-box id="stonePlate" position="-2 0.5 -4" width="1" height="1.5" depth="0.2"
-                   color="#696969" class="clickable"
-                   animation__mouseenter="property: scale; to: 1.1 1.1 1.1; startEvents: mouseenter; dur: 200"
-                   animation__mouseleave="property: scale; to: 1 1 1; startEvents: mouseleave; dur: 200"
-                   animation__glow="property: material.emissiveIntensity; from: 0; to: 0.2; dir: alternate; dur: 1500; loop: true">
-                <a-text value="點我！\n一六八四" position="0 0 0.11" align="center" 
-                        color="white" width="4" font="kelsonsans"></a-text>
-            </a-box>
+            <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; margin: 20px 0;">
+                <h2 style="color: #FFD700; margin-bottom: 15px;">📜 歷史揭密</h2>
+                <p style="text-align: left; line-height: 1.8;">
+                    <strong>台灣縣署</strong>是清朝時期的縣級行政中心，建於1684年。<br>
+                    📍 位置：赤崁樓東北方（今成功國小附近）<br>
+                    🏛️ 功能：處理地方行政、司法等事務<br>
+                    📅 歷史：從清朝到日治時期，見證了台南的歷史變遷
+                </p>
+            </div>
             
-            <!-- 考古工具 -->
-            <a-cylinder id="brush" position="1 0.1 -3" radius="0.05" height="0.3"
-                        color="#8B4513" rotation="0 0 90" class="grabbable">
-            </a-cylinder>
+            <h3 style="color: #4CC3D9; margin: 20px 0;">這是1807年《續修台灣縣誌》中記載的縣署建築圖：</h3>
             
-            <!-- 1875年地圖 -->
-            <a-image id="map1875" src="#mapTexture" position="3 2 -5" width="3" height="2"
-                     class="clickable">
-            </a-image>
+            <!-- 縣署建築圖 -->
+            <img id="countyImage" alt="台灣縣署建築圖" style="background: white; padding: 10px;">
             
-            <!-- 場景說明牌 -->
-            <a-text value="第1關：考古現場\n點一下灰色石碑" position="0 3 -4" 
-                    align="center" color="white" width="8" background="color: black">
-            </a-text>
-        </a-entity>
-
-        <!-- 場景2: 清朝縣署 -->
-        <a-entity id="scene2" visible="false">
-            <!-- 縣署建築 -->
-            <a-box position="0 2 -6" width="8" height="4" depth="6" color="#8B4513">
-                <a-text value="台灣縣署" position="0 2.1 3.01" align="center" 
-                        color="gold" width="10"></a-text>
-            </a-box>
+            <!-- 如需使用真實圖片，請將下行註解移除並填入圖片URL -->
+            <!-- <img src="您的縣署圖片URL" alt="台灣縣署建築圖" style="max-width: 100%; height: auto;"> -->
             
-            <!-- 藏頭詩牌匾 -->
-            <a-plane id="poemBoard" position="0 2 -2.9" width="3" height="2" color="#333"
-                     class="clickable">
-                <a-text value="台島初設府\n灣岸築新城\n縣官理民事\n署內判公明" 
-                        position="0 0 0.01" align="center" color="white" width="4"
-                        line-height="60"></a-text>
-            </a-plane>
+            <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; margin: 20px 0; text-align: left;">
+                <p style="font-size: 16px; line-height: 1.8;">
+                    📐 <strong>建築說明：</strong><br>
+                    這張圖展示了傳統的中式官署建築格局，包含大門、中庭、正堂和東西廂房。<br>
+                    這種「三進兩院」的設計是清代官署的典型配置。
+                </p>
+            </div>
             
-            <!-- 官員NPC -->
-            <a-cylinder position="-2 1 -4" radius="0.3" height="2" color="#4169E1">
-                <a-sphere position="0 1.2 0" radius="0.3" color="#FDBCB4"></a-sphere>
-            </a-cylinder>
+            <p style="margin-top: 20px; color: #FFD700;">
+                ⏱️ 完成時間：<span id="completionTime"></span>
+            </p>
             
-            <!-- 場景說明 -->
-            <a-text value="第2關：清朝縣署\n點一下牆上的詩" position="0 4 -4" 
-                    align="center" color="white" width="8" background="color: black">
-            </a-text>
-        </a-entity>
-
-        <!-- 場景3: 日治時期 -->
-        <a-entity id="scene3" visible="false">
-            <!-- 教室 -->
-            <a-box position="0 2 -5" width="6" height="3" depth="5" color="#F5DEB3"
-                   opacity="0.8">
-            </a-box>
-            
-            <!-- 黑板 (摩斯密碼) -->
-            <a-plane id="blackboard" position="0 2 -2.4" width="4" height="2" color="#2F4F2F"
-                     class="clickable">
-                <a-text value="摩斯密碼：\n-.-. .... .. -.- .- -.\n↓\n答案：CHIKAN (赤崁)" 
-                        position="0 0 0.01" align="center" color="white" width="6" line-height="65"></a-text>
-            </a-plane>
-            
-            <!-- 課桌椅 -->
-            <a-box position="-1 0.5 -3" width="0.8" height="0.8" depth="0.6" 
-                   color="#8B4513"></a-box>
-            <a-box position="1 0.5 -3" width="0.8" height="0.8" depth="0.6" 
-                   color="#8B4513"></a-box>
-            
-            <!-- 場景說明 -->
-            <a-text value="第3關：日本時代教室\n點一下黑板" position="0 4 -4" 
-                    align="center" color="white" width="8" background="color: black">
-            </a-text>
-        </a-entity>
-
-        <!-- 場景4: 時空整合室 -->
-        <a-entity id="scene4" visible="false">
-            <!-- 3D地圖平台 -->
-            <a-cylinder position="0 0.5 -4" radius="3" height="0.2" color="#1E90FF"
-                        opacity="0.7">
-            </a-cylinder>
-            
-            <!-- 赤崁樓模型 -->
-            <a-box position="0 1 -4" width="1" height="0.8" depth="1" color="#DC143C">
-                <a-text value="赤崁樓" position="0 0.5 0" align="center" 
-                        color="white" width="3"></a-text>
-            </a-box>
-            
-            <!-- 縣署位置標記 (需要玩家放置) -->
-            <a-sphere id="countyMarker" position="2 1 -3" radius="0.2" color="#FFD700"
-                      class="grabbable"
-                      animation="property: position; to: 2 1.3 -3; dir: alternate; dur: 1000; loop: true">
-                <a-text value="拖我到\n正確位置" position="0 0.5 0" align="center" 
-                        color="black" width="3" background="color: yellow"></a-text>
-            </a-sphere>
-            
-            <!-- 最終確認按鈕 -->
-            <a-box id="confirmButton" position="0 1.5 -2" width="2" height="0.5" depth="0.1"
-                   color="#32CD32" class="clickable">
-                <a-text value="確認位置" position="0 0 0.06" align="center" 
-                        color="white" width="5"></a-text>
-            </a-box>
-            
-            <!-- 場景說明 -->
-            <a-text value="第4關：最終任務\n把金球拖到赤崁樓的右上方，再按綠色按鈕" position="0 4 -4" 
-                    align="center" color="white" width="10" background="color: black">
-            </a-text>
-        </a-entity>
-
-        <!-- 額外光源增加亮度 -->
-        <a-light type="ambient" color="#FFF" intensity="0.3"></a-light>
-        <a-light type="directional" color="#FFF" intensity="0.4" position="-0.5 1 1"></a-light>
-    </a-scene>
+            <div class="buttonGroup">
+                <button class="actionButton restartButton" onclick="restartGame()">
+                    🔄 重新挑戰
+                </button>
+                <button class="actionButton exitButton" onclick="exitGame()">
+                    🚪 離開遊戲
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // 遊戲狀態
         let gameState = {
             currentScene: 1,
-            cluesFound: 0,
             timeRemaining: 900, // 15分鐘
-            clues: {
-                year1684: false,
-                taiwanCounty: false,
-                chikan: false,
-                location: false
-            }
+            inventory: [],
+            puzzlesSolved: {
+                scene1: false,
+                scene2: false,
+                scene3: false,
+                scene4: false
+            },
+            foundItems: {
+                stonePlate: false,
+                poem: false,
+                morse: false,
+                map: false
+            },
+            playerId: '', // 玩家ID
+            startTime: null, // 開始時間
+            actions: [] // 操作記錄
         };
 
         let timerInterval;
-        let gameStarted = false;
+        let draggedMarker = null;
+        
+        // Google Apps Script Web App URL (需要提供)
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwVdNQTsfAn4ggsBKHGKRx5DrOVEzEhzMIYI3-319f5LJvz056SWCx1G1_EOC1vY6CV-g/exec';
 
-        // 確保 A-Frame 完全載入後再執行
-        window.addEventListener('DOMContentLoaded', function() {
-            // 等待 A-Frame 初始化
-            if (typeof AFRAME === 'undefined') {
-                console.log('等待 A-Frame 載入...');
-                // 如果 AFRAME 還未定義，等待一下再試
-                setTimeout(function() {
-                    initializeGame();
-                }, 1000);
-            } else {
-                initializeGame();
+        // 場景資料
+        const scenes = {
+            1: {
+                title: '第1關：考古密室',
+                background: 'linear-gradient(to bottom, #8B7355 0%, #654321 100%)',
+                description: '這是一個充滿塵土的考古現場，牆上有古老的地圖，地上散落著考古工具...',
+                items: [
+                    {
+                        id: 'stonePlate',
+                        emoji: '🗿',
+                        name: '神秘石碑',
+                        description: '上面刻著：一六八四',
+                        position: { left: '30%', top: '40%' },
+                        clickAction: 'showPuzzle1'
+                    },
+                    {
+                        id: 'map1875',
+                        emoji: '🗺️',
+                        name: '1875年地圖',
+                        description: '台灣府城街道圖',
+                        position: { left: '70%', top: '30%' },
+                        clickAction: 'collectItem'
+                    },
+                    {
+                        id: 'brush',
+                        emoji: '🖌️',
+                        name: '考古刷',
+                        description: '用來清理文物的工具',
+                        position: { left: '50%', top: '60%' },
+                        clickAction: 'showMessage'
+                    }
+                ]
+            },
+            2: {
+                title: '第2關：古代官府密室',
+                background: 'linear-gradient(to bottom, #8B4513 0%, #654321 100%)',
+                description: '這裡是清朝的官府大廳，有官員辦公的桌椅，牆上掛著詩詞...',
+                items: [
+                    {
+                        id: 'poemWall',
+                        emoji: '📜',
+                        name: '牆上的詩',
+                        description: '一首藏頭詩',
+                        position: { left: '50%', top: '35%' },
+                        clickAction: 'showPuzzle2'
+                    },
+                    {
+                        id: 'seal',
+                        emoji: '🏮',
+                        name: '官印',
+                        description: '縣官的印章',
+                        position: { left: '20%', top: '50%' },
+                        clickAction: 'collectItem'
+                    },
+                    {
+                        id: 'document',
+                        emoji: '📋',
+                        name: '公文',
+                        description: '續修台灣縣誌',
+                        position: { left: '80%', top: '45%' },
+                        clickAction: 'showMessage'
+                    }
+                ]
+            },
+            3: {
+                title: '第3關：日式教室密室',
+                background: 'linear-gradient(to bottom, #F5DEB3 0%, #D2691E 100%)',
+                description: '這是日治時期的教室，黑板上寫著奇怪的符號...',
+                items: [
+                    {
+                        id: 'blackboard',
+                        emoji: '🎓',
+                        name: '黑板',
+                        description: '上面有摩斯密碼',
+                        position: { left: '50%', top: '30%' },
+                        clickAction: 'showPuzzle3'
+                    },
+                    {
+                        id: 'textbook',
+                        emoji: '📚',
+                        name: '課本',
+                        description: '日文教科書',
+                        position: { left: '25%', top: '55%' },
+                        clickAction: 'collectItem'
+                    },
+                    {
+                        id: 'abacus',
+                        emoji: '🧮',
+                        name: '算盤',
+                        description: '古老的計算工具',
+                        position: { left: '75%', top: '50%' },
+                        clickAction: 'showMessage'
+                    }
+                ]
+            },
+            4: {
+                title: '第4關：地圖密室',
+                background: 'linear-gradient(to bottom, #1E90FF 0%, #000080 100%)',
+                description: '最後的密室！牆上有一幅巨大的3D地圖，必須標記出正確的位置...',
+                items: [
+                    {
+                        id: 'finalMap',
+                        emoji: '🗾',
+                        name: '立體地圖',
+                        description: '標記縣署位置',
+                        position: { left: '50%', top: '40%' },
+                        clickAction: 'showPuzzle4'
+                    }
+                ]
             }
-        });
+        };
 
-        function initializeGame() {
-            // 簡單的抓取功能
-            AFRAME.registerComponent('grabbable', {
-                init: function() {
-                    this.el.addEventListener('click', function(evt) {
-                        // 簡化版：點擊後跟隨相機移動
-                        console.log('物件被抓取');
-                    });
-                }
+        // 初始化遊戲
+        function initGame() {
+            // 生成玩家ID
+            gameState.playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            
+            document.getElementById('startBtn').addEventListener('click', startGame);
+            
+            // 物品欄點擊事件
+            document.querySelectorAll('.inventorySlot').forEach(slot => {
+                slot.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.slot);
+                    if (gameState.inventory[index]) {
+                        const item = gameState.inventory[index];
+                        showMessage(`這是${item.name}：${item.description}`);
+                        // 記錄查看物品
+                        trackAction('view_inventory', item.name, `查看物品：${item.name}`);
+                    }
+                });
             });
-
-            // 綁定開始按鈕
-            document.getElementById('startButton').addEventListener('click', startGame);
-
-            console.log('遊戲初始化完成！');
         }
 
-        function startGame() {
-            // 隱藏說明介面
-            document.getElementById('gameIntro').style.display = 'none';
-            // 顯示遊戲UI
-            document.getElementById('gameUI').style.display = 'block';
+        // 追蹤動作
+        function trackAction(actionType, itemName = '', note = '') {
+            const action = {
+                actionType: actionType,
+                itemName: itemName,
+                scene: gameState.currentScene,
+                gameTime: gameState.startTime ? Math.floor((Date.now() - gameState.startTime) / 1000) : 0,
+                note: note,
+                timestamp: new Date().toISOString()
+            };
             
-            gameStarted = true;
+            gameState.actions.push(action);
+            
+            // 即時發送到Google Sheets
+            sendToGoogleSheets(action);
+        }
 
-            // 綁定所有互動事件
-            setupEventListeners();
+        // 發送資料到Google Sheets
+        function sendToGoogleSheets(action) {
+            // 如果沒有設定URL，只在console記錄
+            if (GOOGLE_SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+                console.log('追蹤動作:', action);
+                return;
+            }
+            
+            const data = {
+                playerId: gameState.playerId,
+                ...action
+            };
+            
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', // 避免CORS問題
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(() => {
+                console.log('資料已送出');
+            })
+            .catch(error => {
+                console.error('發送失敗:', error);
+            });
+        }
 
+        // 開始遊戲
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'flex';
+            
+            // 記錄開始時間
+            gameState.startTime = Date.now();
+            
+            // 記錄遊戲開始
+            trackAction('game_started', '', '遊戲開始');
+            
             // 啟動計時器
             startTimer();
-
-            console.log('遊戲開始！');
+            
+            // 載入第一個場景
+            loadScene(1);
+            
+            // 播放開始音效
+            playSound('start');
         }
 
-        function setupEventListeners() {
-            // 互動事件
-            document.getElementById('stonePlate').addEventListener('click', function() {
-                collectClue('year1684');
-            });
-
-            document.getElementById('poemBoard').addEventListener('click', function() {
-                collectClue('taiwanCounty');
-            });
-
-            document.getElementById('blackboard').addEventListener('click', function() {
-                collectClue('chikan');
-            });
-
-            document.getElementById('confirmButton').addEventListener('click', function() {
-                // 檢查縣署標記是否在正確位置
-                const marker = document.getElementById('countyMarker');
-                const markerPos = marker.getAttribute('position');
-                
-                // 簡化判定：只要在赤崁樓右邊就算對
-                if (markerPos.x > 0.3) {
-                    collectClue('location');
-                    endGame(true);
-                } else {
-                    showNotification('再想想看！縣署在赤崁樓的「右邊」喔！');
-                }
-            });
-        }
-
+        // 計時器
         function startTimer() {
-            // 計時器
             timerInterval = setInterval(() => {
                 gameState.timeRemaining--;
                 updateTimer();
+                
                 if (gameState.timeRemaining <= 0) {
                     endGame(false);
                 }
@@ -399,100 +894,573 @@
                 `${minutes}:${seconds.toString().padStart(2, '0')}`;
         }
 
-        // 線索收集
-        function collectClue(clueName) {
-            if (!gameState.clues[clueName]) {
-                gameState.clues[clueName] = true;
-                gameState.cluesFound++;
-                document.getElementById('clueCount').textContent = gameState.cluesFound;
-                showNotification(`✨ ${getClueText(clueName)}`);
-                
-                // 播放成功音效（使用簡單的beep聲）
-                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZURE');
-                audio.volume = 0.3;
-                audio.play();
-                
-                // 檢查是否可以進入下一場景
-                checkSceneProgress();
+        // 載入場景
+        function loadScene(sceneNum) {
+            const scene = scenes[sceneNum];
+            const sceneArea = document.getElementById('sceneArea');
+            
+            // 記錄場景切換
+            if (gameState.currentScene !== sceneNum) {
+                trackAction('scene_changed', `場景${sceneNum}`, `進入${scene.title}`);
+            }
+            
+            // 清空場景
+            sceneArea.innerHTML = '';
+            sceneArea.style.background = scene.background;
+            sceneArea.classList.add('sceneTransition');
+            
+            // 更新標題
+            document.getElementById('sceneTitle').textContent = scene.title;
+            gameState.currentScene = sceneNum;
+            
+            // 顯示場景描述
+            showMessage(scene.description);
+            
+            // 添加場景物品
+            scene.items.forEach(item => {
+                if (!gameState.foundItems[item.id] || item.clickAction.includes('Puzzle')) {
+                    const itemElement = document.createElement('div');
+                    itemElement.className = 'clickable glow';
+                    itemElement.innerHTML = `<span style="font-size: 60px;">${item.emoji}</span>`;
+                    itemElement.style.left = item.position.left;
+                    itemElement.style.top = item.position.top;
+                    itemElement.dataset.itemId = item.id;
+                    
+                    itemElement.addEventListener('click', () => handleItemClick(item));
+                    
+                    sceneArea.appendChild(itemElement);
+                }
+            });
+            
+            setTimeout(() => {
+                sceneArea.classList.remove('sceneTransition');
+            }, 1000);
+        }
+
+        // 處理物品點擊
+        function handleItemClick(item) {
+            // 記錄點擊物品
+            trackAction('click_item', item.name, `點擊物品：${item.name}`);
+            
+            switch(item.clickAction) {
+                case 'collectItem':
+                    collectItem(item);
+                    break;
+                case 'showMessage':
+                    showMessage(item.description);
+                    break;
+                case 'showPuzzle1':
+                    showPuzzle1();
+                    break;
+                case 'showPuzzle2':
+                    showPuzzle2();
+                    break;
+                case 'showPuzzle3':
+                    showPuzzle3();
+                    break;
+                case 'showPuzzle4':
+                    showPuzzle4();
+                    break;
             }
         }
 
-        function getClueText(clueName) {
-            const clueTexts = {
-                year1684: '找到了！1684年是台灣設立縣政府的年份',
-                taiwanCounty: '太棒了！「台灣縣署」就是古代的縣政府',
-                chikan: '解出來了！CHIKAN就是「赤崁」',
-                location: '成功！縣署就在赤崁樓的東北邊'
-            };
-            return clueTexts[clueName] || clueName;
+        // 收集物品
+        function collectItem(item) {
+            if (gameState.foundItems[item.id]) return;
+            
+            gameState.foundItems[item.id] = true;
+            gameState.inventory.push(item);
+            
+            // 記錄收集物品
+            trackAction('item_collected', item.name, `收集了${item.name}`);
+            
+            // 更新物品欄
+            updateInventory();
+            
+            // 移除場景中的物品
+            const itemElement = document.querySelector(`[data-item-id="${item.id}"]`);
+            if (itemElement) {
+                itemElement.classList.add('success');
+                setTimeout(() => itemElement.remove(), 500);
+            }
+            
+            showMessage(`獲得了 ${item.name}！`);
+            playSound('collect');
+            
+            // 更新進度
+            updateProgress();
         }
 
-        function showNotification(text) {
-            const notification = document.getElementById('clueNotification');
-            notification.textContent = text;
-            notification.style.display = 'block';
+        // 更新物品欄
+        function updateInventory() {
+            gameState.inventory.forEach((item, index) => {
+                const slot = document.querySelector(`[data-slot="${index}"]`);
+                if (slot) {
+                    slot.innerHTML = `
+                        <span class="inventoryItem">${item.emoji}</span>
+                        <span class="itemTooltip">${item.name}</span>
+                    `;
+                    slot.classList.add('filled');
+                }
+            });
+        }
+
+        // 顯示訊息
+        function showMessage(text) {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.textContent = text;
+            messageBox.style.display = 'block';
+            
             setTimeout(() => {
-                notification.style.display = 'none';
+                messageBox.style.display = 'none';
             }, 3000);
         }
 
-        // 場景切換
-        function switchScene(sceneNum) {
-            // 隱藏所有場景
-            for (let i = 1; i <= 4; i++) {
-                document.getElementById(`scene${i}`).setAttribute('visible', false);
-            }
-            // 顯示目標場景
-            document.getElementById(`scene${sceneNum}`).setAttribute('visible', true);
-            gameState.currentScene = sceneNum;
+        // 謎題1：石碑密碼
+        function showPuzzle1() {
+            const modal = document.getElementById('puzzleModal');
+            const content = document.getElementById('puzzleContent');
             
-            // 更新UI
-            const sceneNames = ['', '第1關：挖挖看', '第2關：讀古詩', '第3關：解密碼', '第4關：找位置'];
-            document.getElementById('currentScene').textContent = sceneNames[sceneNum];
+            content.innerHTML = `
+                <h3>🗿 石碑上的密碼</h3>
+                <p>石碑上刻著四個數字，這似乎是某個重要的年份...</p>
+                <div class="lockDisplay">一六八四</div>
+                <p>請輸入這個年份（阿拉伯數字）：</p>
+                <input type="text" id="puzzle1Input" maxlength="4" style="width: 150px; font-size: 24px;">
+                <br>
+                <button onclick="checkPuzzle1()">確認</button>
+                <button onclick="closePuzzle()">返回</button>
+            `;
+            
+            modal.style.display = 'flex';
+            document.getElementById('puzzle1Input').focus();
         }
 
-        function checkSceneProgress() {
-            if (gameState.currentScene === 1 && gameState.clues.year1684) {
-                showNotification('🎯 做得好！準備進入下一關...');
-                setTimeout(() => switchScene(2), 2000);
-            } else if (gameState.currentScene === 2 && gameState.clues.taiwanCounty) {
-                showNotification('🎯 太棒了！前往下一個時代...');
-                setTimeout(() => switchScene(3), 2000);
-            } else if (gameState.currentScene === 3 && gameState.clues.chikan) {
-                showNotification('🎯 最後一關！找出縣署的位置...');
-                setTimeout(() => switchScene(4), 2000);
+        // 檢查謎題1答案
+        function checkPuzzle1() {
+            const input = document.getElementById('puzzle1Input').value;
+            
+            // 記錄謎題嘗試
+            trackAction('puzzle_attempt', '石碑密碼', `嘗試答案：${input}`);
+            
+            if (input === '1684') {
+                gameState.puzzlesSolved.scene1 = true;
+                trackAction('puzzle_solved', '石碑密碼', '成功解開石碑密碼');
+                closePuzzle();
+                showMessage('✨ 解開了！1684年是台灣設立府縣的重要年份！');
+                playSound('success');
+                
+                // 收集石碑
+                const stonePlate = scenes[1].items.find(item => item.id === 'stonePlate');
+                collectItem(stonePlate);
+                
+                // 3秒後進入下一關
+                setTimeout(() => {
+                    showMessage('密室的門打開了！進入下一個房間...');
+                    setTimeout(() => loadScene(2), 1500);
+                }, 2000);
+            } else {
+                trackAction('puzzle_failed', '石碑密碼', `錯誤答案：${input}`);
+                showMessage('❌ 密碼錯誤！再仔細看看石碑上的數字...');
+                playSound('error');
             }
+        }
+
+        // 謎題2：藏頭詩
+        function showPuzzle2() {
+            const modal = document.getElementById('puzzleModal');
+            const content = document.getElementById('puzzleContent');
+            
+            content.innerHTML = `
+                <h3>📜 神秘的藏頭詩</h3>
+                <div class="poem">
+                    <span class="firstChar">台</span>島初設府<br>
+                    <span class="firstChar">灣</span>岸築新城<br>
+                    <span class="firstChar">縣</span>官理民事<br>
+                    <span class="firstChar">署</span>內判公明
+                </div>
+                <p>每句詩的第一個字連起來是什麼？</p>
+                <input type="text" id="puzzle2Input" maxlength="10" style="width: 200px;">
+                <br>
+                <button onclick="checkPuzzle2()">確認</button>
+                <button onclick="closePuzzle()">返回</button>
+            `;
+            
+            modal.style.display = 'flex';
+            document.getElementById('puzzle2Input').focus();
+        }
+
+        // 檢查謎題2答案
+        function checkPuzzle2() {
+            const input = document.getElementById('puzzle2Input').value;
+            if (input === '台灣縣署' || input === '臺灣縣署') {
+                gameState.puzzlesSolved.scene2 = true;
+                closePuzzle();
+                showMessage('✨ 太棒了！原來這裡就是「台灣縣署」！');
+                playSound('success');
+                
+                // 收集詩詞
+                const poem = scenes[2].items.find(item => item.id === 'poemWall');
+                collectItem(poem);
+                
+                // 進入下一關
+                setTimeout(() => {
+                    showMessage('又一扇門打開了！繼續前進...');
+                    setTimeout(() => loadScene(3), 1500);
+                }, 2000);
+            } else {
+                showMessage('❌ 不對喔！看看每句詩的第一個字...');
+                playSound('error');
+            }
+        }
+
+        // 謎題3：摩斯密碼
+        function showPuzzle3() {
+            const modal = document.getElementById('puzzleModal');
+            const content = document.getElementById('puzzleContent');
+            
+            content.innerHTML = `
+                <h3>🎓 黑板上的摩斯密碼</h3>
+                <p>黑板上寫著：</p>
+                <div style="font-family: monospace; font-size: 24px; margin: 20px 0;">
+                    -.-. .... .. -.- .- -.
+                </div>
+                <p>提示：這是一個地名的英文拼音</p>
+                <p>摩斯密碼對照表：<br>
+                C = -.-.　H = ....　I = ..　K = -.-　A = .-　N = -.</p>
+                <input type="text" id="puzzle3Input" maxlength="10" style="width: 200px;">
+                <br>
+                <button onclick="checkPuzzle3()">確認</button>
+                <button onclick="closePuzzle()">返回</button>
+            `;
+            
+            modal.style.display = 'flex';
+            document.getElementById('puzzle3Input').focus();
+        }
+
+        // 檢查謎題3答案
+        function checkPuzzle3() {
+            const input = document.getElementById('puzzle3Input').value.toUpperCase();
+            if (input === 'CHIKAN' || input === '赤崁' || input === '赤嵌') {
+                gameState.puzzlesSolved.scene3 = true;
+                closePuzzle();
+                showMessage('✨ 解碼成功！CHIKAN 就是「赤崁」！');
+                playSound('success');
+                
+                // 收集黑板
+                const blackboard = scenes[3].items.find(item => item.id === 'blackboard');
+                collectItem(blackboard);
+                
+                // 進入最後一關
+                setTimeout(() => {
+                    showMessage('最後一道門開啟了！這是最終的挑戰...');
+                    setTimeout(() => loadScene(4), 1500);
+                }, 2000);
+            } else {
+                showMessage('❌ 再試試看！用對照表解碼...');
+                playSound('error');
+            }
+        }
+
+        // 謎題4：地圖標記
+        function showPuzzle4() {
+            const modal = document.getElementById('puzzleModal');
+            const content = document.getElementById('puzzleContent');
+            
+            content.innerHTML = `
+                <h3>🗾 標記縣署位置</h3>
+                <p>根據你收集的線索，在地圖上標記出台灣縣署的位置</p>
+                <p>提示：縣署在赤崁樓的<strong>東北方</strong>（右上方）</p>
+                <div id="mapContainer">
+                    <div id="chicanMarker" class="mapMarker" title="赤崁樓"></div>
+                    <div id="countyMarker" class="mapMarker" title="拖動我到正確位置"></div>
+                </div>
+                <button onclick="checkPuzzle4()">確認位置</button>
+                <button onclick="closePuzzle()">返回</button>
+            `;
+            
+            modal.style.display = 'flex';
+            
+            // 設置拖曳功能
+            setupDragAndDrop();
+        }
+
+        // 設置拖曳功能
+        function setupDragAndDrop() {
+            const marker = document.getElementById('countyMarker');
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+            
+            marker.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = marker.getBoundingClientRect();
+                const containerRect = marker.parentElement.getBoundingClientRect();
+                initialLeft = rect.left - containerRect.left;
+                initialTop = rect.top - containerRect.top;
+                marker.style.cursor = 'grabbing';
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+                
+                marker.style.left = `${initialLeft + deltaX}px`;
+                marker.style.top = `${initialTop + deltaY}px`;
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                if (marker) marker.style.cursor = 'move';
+            });
+        }
+
+        // 檢查謎題4答案
+        function checkPuzzle4() {
+            const county = document.getElementById('countyMarker');
+            const chican = document.getElementById('chicanMarker');
+            
+            const countyRect = county.getBoundingClientRect();
+            const chicanRect = chican.getBoundingClientRect();
+            
+            // 檢查是否在赤崁樓的右上方
+            if (countyRect.left > chicanRect.left && countyRect.top < chicanRect.top) {
+                gameState.puzzlesSolved.scene4 = true;
+                closePuzzle();
+                showMessage('🎉 太棒了！你成功找到了台灣縣署的位置！');
+                playSound('success');
+                
+                // 收集地圖物品
+                const finalMap = scenes[4].items.find(item => item.id === 'finalMap');
+                collectItem(finalMap);
+                
+                // 遊戲勝利
+                setTimeout(() => {
+                    endGame(true);
+                }, 2000);
+            } else {
+                showMessage('❌ 位置不對！記得縣署在赤崁樓的「東北方」（右上方）');
+                playSound('error');
+            }
+        }
+
+        // 關閉謎題
+        function closePuzzle() {
+            document.getElementById('puzzleModal').style.display = 'none';
+        }
+
+        // 更新進度
+        function updateProgress() {
+            const progress = Object.values(gameState.foundItems).filter(v => v).length;
+            document.getElementById('progress').textContent = `${progress}/4`;
         }
 
         // 遊戲結束
         function endGame(success) {
-            if (!gameStarted) return;
-            
             clearInterval(timerInterval);
+            
+            const totalTime = Math.floor((Date.now() - gameState.startTime) / 1000);
+            
             if (success) {
-                showNotification('🎉 太厲害了！你找到台灣縣署了！');
-                // 顯示縣署重建動畫
-                setTimeout(() => {
-                    const message = `
-🎊 恭喜你完成任務！
-
-你發現了什麼？
-📍 台灣縣署就在赤崁樓的右上方（東北邊）
-📍 現在那個位置是成功國小
-
-小知識時間：
-🏛️ 縣署 = 古代的縣政府
-📅 1684年 = 台灣開始有縣政府
-🏫 現在 = 變成了你們的學校！
-
-你真是個優秀的時光偵探！
-                    `;
-                    alert(message);
-                }, 3000);
+                // 記錄遊戲完成
+                trackAction('game_completed', '', `成功完成，耗時${totalTime}秒`);
+                
+                // 計算完成時間
+                const usedTime = 900 - gameState.timeRemaining;
+                const minutes = Math.floor(usedTime / 60);
+                const seconds = usedTime % 60;
+                
+                // 顯示成功畫面
+                document.getElementById('successScreen').style.display = 'flex';
+                document.getElementById('completionTime').textContent = 
+                    `${minutes}分${seconds}秒`;
+                
+                // 發送完整遊戲記錄
+                sendGameSummary(true, totalTime);
+                
+                // 設置縣署圖片 - 使用SVG繪製仿古建築圖
+                const svgContent = `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" style="background: #f5f5dc;">
+                        <!-- 外圍邊框 -->
+                        <rect x="50" y="50" width="700" height="500" fill="none" stroke="#000" stroke-width="3"/>
+                        
+                        <!-- 主建築群 -->
+                        <!-- 前廳 -->
+                        <rect x="300" y="450" width="200" height="80" fill="none" stroke="#000" stroke-width="2"/>
+                        <text x="400" y="495" text-anchor="middle" font-size="20" font-family="serif">大門</text>
+                        
+                        <!-- 中庭 -->
+                        <rect x="200" y="300" width="400" height="120" fill="none" stroke="#000" stroke-width="2"/>
+                        <text x="400" y="365" text-anchor="middle" font-size="20" font-family="serif">中庭</text>
+                        
+                        <!-- 正堂 -->
+                        <rect x="250" y="150" width="300" height="120" fill="none" stroke="#000" stroke-width="2"/>
+                        <text x="400" y="215" text-anchor="middle" font-size="20" font-family="serif">正堂</text>
+                        
+                        <!-- 左右廂房 -->
+                        <rect x="100" y="200" width="80" height="200" fill="none" stroke="#000" stroke-width="2"/>
+                        <text x="140" y="305" text-anchor="middle" font-size="16" font-family="serif" writing-mode="tb">東廂</text>
+                        
+                        <rect x="620" y="200" width="80" height="200" fill="none" stroke="#000" stroke-width="2"/>
+                        <text x="660" y="305" text-anchor="middle" font-size="16" font-family="serif" writing-mode="tb">西廂</text>
+                        
+                        <!-- 屋頂線條 -->
+                        <path d="M 250 150 L 400 100 L 550 150" fill="none" stroke="#000" stroke-width="2"/>
+                        <path d="M 200 300 L 400 250 L 600 300" fill="none" stroke="#000" stroke-width="2"/>
+                        
+                        <!-- 標題 -->
+                        <text x="750" y="100" text-anchor="end" font-size="24" font-family="serif" writing-mode="tb">縣署圖</text>
+                        <text x="50" y="580" font-size="16" font-family="serif">台灣縣署 (1807年《續修台灣縣誌》)</text>
+                        
+                        <!-- 裝飾性元素 -->
+                        <circle cx="400" cy="360" r="30" fill="none" stroke="#000" stroke-width="1"/>
+                        <rect x="385" y="345" width="30" height="30" fill="none" stroke="#000" stroke-width="1"/>
+                    </svg>
+                `;
+                document.getElementById('countyImage').src = 
+                    'data:image/svg+xml,' + encodeURIComponent(svgContent);
+                
+                // 播放勝利音效
+                playSound('victory');
             } else {
-                alert('⏰ 時間到了！\n\n沒關係，再試一次吧！\n\n💡小提示：\n1. 記得點擊發亮的物品\n2. 石碑、詩、黑板都要點\n3. 金球要放在赤崁樓的右上方');
+                // 記錄遊戲失敗
+                trackAction('game_failed', '', `時間到，耗時${totalTime}秒`);
+                
+                // 發送完整遊戲記錄
+                sendGameSummary(false, totalTime);
+                
+                alert(`
+                    ⏰ 時間到了！
+                    
+                    你被困在時光密室裡了...
+                    
+                    💡 小提示：
+                    1. 點擊發光的物品收集線索
+                    2. 仔細觀察每個謎題的提示
+                    3. 記住：1684、台灣縣署、赤崁、東北方
+                    
+                    再試一次吧！
+                `);
+                
+                // 重新開始
+                restartGame();
             }
         }
+        
+        // 發送遊戲總結
+        function sendGameSummary(completed, totalTime) {
+            const summary = {
+                playerId: gameState.playerId,
+                actionType: 'game_summary',
+                itemName: '',
+                scene: 'final',
+                gameTime: totalTime,
+                note: JSON.stringify({
+                    completed: completed,
+                    totalActions: gameState.actions.length,
+                    itemsCollected: gameState.inventory.length,
+                    puzzlesSolved: Object.values(gameState.puzzlesSolved).filter(v => v).length
+                })
+            };
+            
+            sendToGoogleSheets(summary);
+        }
+
+        // 重新開始遊戲
+        function restartGame() {
+            location.reload();
+        }
+
+        // 離開遊戲
+        function exitGame() {
+            if (confirm('確定要離開遊戲嗎？')) {
+                // 嘗試關閉視窗，如果無法關閉則導向空白頁
+                window.close();
+                // 如果window.close()失敗（大多數現代瀏覽器會阻止）
+                window.location.href = 'about:blank';
+            }
+        }
+
+        // 音效函數（簡化版）
+        function playSound(type) {
+            // 使用 Web Audio API 創建簡單的音效
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            switch(type) {
+                case 'start':
+                    oscillator.frequency.value = 523.25; // C5
+                    gainNode.gain.value = 0.3;
+                    break;
+                case 'collect':
+                    oscillator.frequency.value = 659.25; // E5
+                    gainNode.gain.value = 0.2;
+                    break;
+                case 'success':
+                    oscillator.frequency.value = 783.99; // G5
+                    gainNode.gain.value = 0.3;
+                    break;
+                case 'error':
+                    oscillator.frequency.value = 293.66; // D4
+                    gainNode.gain.value = 0.2;
+                    break;
+                case 'victory':
+                    // 勝利音效 - 上升音階
+                    oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+                    oscillator.frequency.linearRampToValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
+                    oscillator.frequency.linearRampToValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
+                    oscillator.frequency.linearRampToValueAtTime(1046.50, audioContext.currentTime + 0.3); // C6
+                    gainNode.gain.value = 0.4;
+                    break;
+            }
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + (type === 'victory' ? 0.4 : 0.2));
+        }
+
+        // 初始化
+        window.onload = initGame;
+        
+        // 提醒設定 Google Apps Script URL
+        if (GOOGLE_SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+            console.warn('⚠️ 請設定 Google Apps Script Web App URL 來啟用資料追蹤功能');
+            console.log('📊 目前資料只會在控制台顯示，不會傳送到 Google Sheets');
+            console.log('💡 提示：在控制台輸入 exportGameData() 可以匯出所有追蹤資料');
+        }
+        
+        // 資料匯出功能（供測試用）
+        window.exportGameData = function() {
+            console.log('=== 遊戲資料匯出 ===');
+            console.log('玩家ID:', gameState.playerId);
+            console.log('總動作數:', gameState.actions.length);
+            console.log('詳細記錄:');
+            console.table(gameState.actions);
+            
+            // 產生CSV格式
+            const csv = [
+                ['時間戳記', '動作類型', '物件名稱', '場景', '遊戲時間', '備註'],
+                ...gameState.actions.map(a => [
+                    a.timestamp,
+                    a.actionType,
+                    a.itemName,
+                    a.scene,
+                    a.gameTime,
+                    a.note
+                ])
+            ].map(row => row.join(',')).join('\n');
+            
+            console.log('\n=== CSV 格式資料 ===');
+            console.log(csv);
+            
+            return gameState.actions;
+        };
     </script>
 </body>
 </html>
