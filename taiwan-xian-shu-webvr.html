@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>時光偵探：尋找失落的台灣縣署</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://github.com/supermedium/superframe/tree/master/components/environment/dist/aframe-environment-component.min.js"></script>
+    <style>
+        #gameUI {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial;
+            z-index: 999;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #clueNotification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,150,0,0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameUI">
+        <h3>時光偵探：尋找失落的台灣縣署</h3>
+        <p>場景: <span id="currentScene">考古現場</span></p>
+        <p>收集線索: <span id="clueCount">0</span>/4</p>
+        <p>時間: <span id="timer">15:00</span></p>
+    </div>
+    
+    <div id="clueNotification"></div>
+
+    <a-scene environment="preset: japan; groundColor: #445; grid: cross">
+        <!-- 資源定義 -->
+        <a-assets>
+            <!-- 可以在這裡加入圖片或模型資源 -->
+            <img id="mapTexture" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" alt="map">
+        </a-assets>
+
+        <!-- 相機與控制器 -->
+        <a-entity id="player" position="0 1.6 0">
+            <a-camera>
+                <a-cursor color="#4CC3D9"></a-cursor>
+            </a-camera>
+            <a-entity laser-controls="hand: right"></a-entity>
+            <a-entity laser-controls="hand: left"></a-entity>
+        </a-entity>
+
+        <!-- 場景1: 考古現場 -->
+        <a-entity id="scene1" visible="true">
+            <!-- 考古區域地面 -->
+            <a-plane position="0 0 -4" rotation="-90 0 0" width="10" height="10" 
+                     color="#8B7355" roughness="0.8">
+            </a-plane>
+            
+            <!-- 石碑 (軌跡解謎) -->
+            <a-box id="stonePlate" position="-2 0.5 -4" width="1" height="1.5" depth="0.2"
+                   color="#696969" class="clickable"
+                   animation__mouseenter="property: scale; to: 1.1 1.1 1.1; startEvents: mouseenter; dur: 200"
+                   animation__mouseleave="property: scale; to: 1 1 1; startEvents: mouseleave; dur: 200">
+                <a-text value="追蹤筆劃:\n一六八四" position="0 0 0.11" align="center" 
+                        color="white" width="3"></a-text>
+            </a-box>
+            
+            <!-- 考古工具 -->
+            <a-cylinder id="brush" position="1 0.1 -3" radius="0.05" height="0.3"
+                        color="#8B4513" rotation="0 0 90" class="grabbable">
+            </a-cylinder>
+            
+            <!-- 1875年地圖 -->
+            <a-image id="map1875" src="#mapTexture" position="3 2 -5" width="3" height="2"
+                     class="clickable">
+            </a-image>
+            
+            <!-- 場景說明牌 -->
+            <a-text value="考古現場\n找出石碑上的年份線索" position="0 3 -4" 
+                    align="center" color="white" width="6">
+            </a-text>
+        </a-entity>
+
+        <!-- 場景2: 清朝縣署 -->
+        <a-entity id="scene2" visible="false">
+            <!-- 縣署建築 -->
+            <a-box position="0 2 -6" width="8" height="4" depth="6" color="#8B4513">
+                <a-text value="台灣縣署" position="0 2.1 3.01" align="center" 
+                        color="gold" width="10"></a-text>
+            </a-box>
+            
+            <!-- 藏頭詩牌匾 -->
+            <a-plane id="poemBoard" position="0 2 -2.9" width="3" height="2" color="#333"
+                     class="clickable">
+                <a-text value="台島初設府\n灣岸築新城\n縣官理民事\n署內判公明" 
+                        position="0 0 0.01" align="center" color="white" width="4"
+                        line-height="60"></a-text>
+            </a-plane>
+            
+            <!-- 官員NPC -->
+            <a-cylinder position="-2 1 -4" radius="0.3" height="2" color="#4169E1">
+                <a-sphere position="0 1.2 0" radius="0.3" color="#FDBCB4"></a-sphere>
+            </a-cylinder>
+        </a-entity>
+
+        <!-- 場景3: 日治時期 -->
+        <a-entity id="scene3" visible="false">
+            <!-- 教室 -->
+            <a-box position="0 2 -5" width="6" height="3" depth="5" color="#F5DEB3"
+                   opacity="0.8">
+            </a-box>
+            
+            <!-- 黑板 (摩斯密碼) -->
+            <a-plane id="blackboard" position="0 2 -2.4" width="4" height="2" color="#2F4F2F"
+                     class="clickable">
+                <a-text value="密碼：\n-.-. .... .. -.- .- -.\n(CHIKAN)" 
+                        position="0 0 0.01" align="center" color="white" width="5"></a-text>
+            </a-plane>
+            
+            <!-- 課桌椅 -->
+            <a-box position="-1 0.5 -3" width="0.8" height="0.8" depth="0.6" 
+                   color="#8B4513"></a-box>
+            <a-box position="1 0.5 -3" width="0.8" height="0.8" depth="0.6" 
+                   color="#8B4513"></a-box>
+        </a-entity>
+
+        <!-- 場景4: 時空整合室 -->
+        <a-entity id="scene4" visible="false">
+            <!-- 3D地圖平台 -->
+            <a-cylinder position="0 0.5 -4" radius="3" height="0.2" color="#1E90FF"
+                        opacity="0.7">
+            </a-cylinder>
+            
+            <!-- 赤崁樓模型 -->
+            <a-box position="0 1 -4" width="1" height="0.8" depth="1" color="#DC143C">
+                <a-text value="赤崁樓" position="0 0.5 0" align="center" 
+                        color="white" width="3"></a-text>
+            </a-box>
+            
+            <!-- 縣署位置標記 (需要玩家放置) -->
+            <a-sphere id="countyMarker" position="2 1 -3" radius="0.2" color="#FFD700"
+                      class="grabbable">
+                <a-text value="縣署" position="0 0.3 0" align="center" 
+                        color="white" width="2"></a-text>
+            </a-sphere>
+            
+            <!-- 最終確認按鈕 -->
+            <a-box id="confirmButton" position="0 1.5 -2" width="2" height="0.5" depth="0.1"
+                   color="#32CD32" class="clickable">
+                <a-text value="確認位置" position="0 0 0.06" align="center" 
+                        color="white" width="5"></a-text>
+            </a-box>
+        </a-entity>
+
+        <!-- 環境光源 -->
+        <a-light type="ambient" color="#BBB"></a-light>
+        <a-light type="directional" color="#FFF" intensity="0.6" 
+                 position="-0.5 1 1"></a-light>
+    </a-scene>
+
+    <script>
+        // 遊戲狀態
+        let gameState = {
+            currentScene: 1,
+            cluesFound: 0,
+            timeRemaining: 900, // 15分鐘
+            clues: {
+                year1684: false,
+                taiwanCounty: false,
+                chikan: false,
+                location: false
+            }
+        };
+
+        let timerInterval;
+
+        // 確保 A-Frame 完全載入後再執行
+        window.addEventListener('DOMContentLoaded', function() {
+            // 等待 A-Frame 初始化
+            if (typeof AFRAME === 'undefined') {
+                console.log('等待 A-Frame 載入...');
+                // 如果 AFRAME 還未定義，等待一下再試
+                setTimeout(function() {
+                    initializeGame();
+                }, 1000);
+            } else {
+                initializeGame();
+            }
+        });
+
+        function initializeGame() {
+            // 簡單的抓取功能
+            AFRAME.registerComponent('grabbable', {
+                init: function() {
+                    this.el.addEventListener('click', function(evt) {
+                        // 簡化版：點擊後跟隨相機移動
+                        console.log('物件被抓取');
+                    });
+                }
+            });
+
+            // 綁定所有互動事件
+            setupEventListeners();
+
+            // 啟動計時器
+            startTimer();
+
+            console.log('遊戲初始化完成！');
+        }
+
+        function setupEventListeners() {
+            // 互動事件
+            document.getElementById('stonePlate').addEventListener('click', function() {
+                collectClue('year1684');
+            });
+
+            document.getElementById('poemBoard').addEventListener('click', function() {
+                collectClue('taiwanCounty');
+            });
+
+            document.getElementById('blackboard').addEventListener('click', function() {
+                collectClue('chikan');
+            });
+
+            document.getElementById('confirmButton').addEventListener('click', function() {
+                // 檢查縣署標記是否在正確位置
+                const marker = document.getElementById('countyMarker');
+                const markerPos = marker.getAttribute('position');
+                
+                // 簡化判定：只要移動了標記就算正確
+                if (markerPos.x > 0.5 && markerPos.z < -3.5) {
+                    collectClue('location');
+                    endGame(true);
+                } else {
+                    showNotification('位置不正確，請再試試看！');
+                }
+            });
+        }
+
+        function startTimer() {
+            // 計時器
+            timerInterval = setInterval(() => {
+                gameState.timeRemaining--;
+                updateTimer();
+                if (gameState.timeRemaining <= 0) {
+                    endGame(false);
+                }
+            }, 1000);
+        }
+
+        function updateTimer() {
+            const minutes = Math.floor(gameState.timeRemaining / 60);
+            const seconds = gameState.timeRemaining % 60;
+            document.getElementById('timer').textContent = 
+                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // 線索收集
+        function collectClue(clueName) {
+            if (!gameState.clues[clueName]) {
+                gameState.clues[clueName] = true;
+                gameState.cluesFound++;
+                document.getElementById('clueCount').textContent = gameState.cluesFound;
+                showNotification(`發現線索：${getClueText(clueName)}`);
+                
+                // 檢查是否可以進入下一場景
+                checkSceneProgress();
+            }
+        }
+
+        function getClueText(clueName) {
+            const clueTexts = {
+                year1684: '1684年 - 台灣設府之年',
+                taiwanCounty: '台灣縣署',
+                chikan: '赤崁 (CHIKAN)',
+                location: '縣署位於赤崁樓東北側'
+            };
+            return clueTexts[clueName] || clueName;
+        }
+
+        function showNotification(text) {
+            const notification = document.getElementById('clueNotification');
+            notification.textContent = text;
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+
+        // 場景切換
+        function switchScene(sceneNum) {
+            // 隱藏所有場景
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById(`scene${i}`).setAttribute('visible', false);
+            }
+            // 顯示目標場景
+            document.getElementById(`scene${sceneNum}`).setAttribute('visible', true);
+            gameState.currentScene = sceneNum;
+            
+            // 更新UI
+            const sceneNames = ['', '考古現場', '清朝縣署', '日治時期', '時空整合室'];
+            document.getElementById('currentScene').textContent = sceneNames[sceneNum];
+        }
+
+        function checkSceneProgress() {
+            if (gameState.currentScene === 1 && gameState.clues.year1684) {
+                setTimeout(() => switchScene(2), 2000);
+            } else if (gameState.currentScene === 2 && gameState.clues.taiwanCounty) {
+                setTimeout(() => switchScene(3), 2000);
+            } else if (gameState.currentScene === 3 && gameState.clues.chikan) {
+                setTimeout(() => switchScene(4), 2000);
+            }
+        }
+
+        // 遊戲結束
+        function endGame(success) {
+            clearInterval(timerInterval);
+            if (success) {
+                showNotification('恭喜！你成功找到了台灣縣署的位置！');
+                // 顯示縣署重建動畫
+                setTimeout(() => {
+                    alert('任務完成！台灣縣署就位於赤崁樓東北側，約在今日成功國小附近。');
+                }, 3000);
+            } else {
+                alert('時間到！請再接再厲！');
+            }
+        }
+    </script>
+</body>
+</html>
